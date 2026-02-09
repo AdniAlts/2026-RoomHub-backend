@@ -4,28 +4,32 @@ namespace Backend.Models;
 
 public class CreateBookingDto
 {
-    [Required(ErrorMessage = "RoomId is required")]
+    [Required(ErrorMessage = "ID Ruangan wajib diisi")]
     public int RoomId { get; set; }
 
-    [Required(ErrorMessage = "BorrowerName is required")]
+    [Required(ErrorMessage = "Nama peminjam wajib diisi")]
+    [StringLength(100, ErrorMessage = "Nama peminjam maksimal 100 karakter")]
     public string BorrowerName { get; set; } = string.Empty;
 
-    [Required(ErrorMessage = "BorrowerId (NIM) is required")]
+    [Required(ErrorMessage = "NIM wajib diisi")]
+    [StringLength(20, ErrorMessage = "NIM maksimal 20 karakter")]
     public string BorrowerId { get; set; } = string.Empty;
 
-    [Required(ErrorMessage = "Purpose is required")]
+    [Required(ErrorMessage = "Tujuan peminjaman wajib diisi")]
     public string Purpose { get; set; } = string.Empty;
 
-    [Required(ErrorMessage = "StartTime is required")]
+    [Required(ErrorMessage = "Waktu mulai wajib diisi")]
     public DateTime StartTime { get; set; }
 
-    [Required(ErrorMessage = "EndTime is required")]
+    [Required(ErrorMessage = "Waktu selesai wajib diisi")]
     public DateTime EndTime { get; set; }
 }
 
 public class UpdateStatusDto
 {
-    [Required(ErrorMessage = "Status is required")]
-    [RegularExpression("^(Pending|Approved|Rejected)$", ErrorMessage = "Status must be 'Pending', 'Approved', or 'Rejected'")]
+    [Required(ErrorMessage = "Status wajib diisi")]
+    [RegularExpression("^(Approved|Rejected)$", ErrorMessage = "Status hanya boleh 'Approved' atau 'Rejected'")]
     public string Status { get; set; } = string.Empty;
+
+    public string? AdminNote { get; set; }
 }

@@ -48,30 +48,38 @@ public class BookingsController : ControllerBase
     [HttpPost]
     public async Task<ActionResult<Booking>> CreateBooking(CreateBookingDto bookingDto)
     {
-        // Validasi apakah Room ada
-        var roomExists = await _context.Rooms.AnyAsync(r => r.Id == bookingDto.RoomId);
-        if (!roomExists)
+        // VALIDASI 1: Cek apakah Ruangan ada di database
+        var room = await _context.Rooms.FindAsync(bookingDto.RoomId);
+        if (room == null)
         {
-            return BadRequest(new { message = "Room not found" });
+            return BadRequest(new { message = "Ruangan tidak ditemukan" });
         }
 
-        // Validasi waktu
+        // VALIDASI 2: Pastikan EndTime lebih besar dari StartTime
         if (bookingDto.EndTime <= bookingDto.StartTime)
         {
-            return BadRequest(new { message = "EndTime must be greater than StartTime" });
+            return BadRequest(new { message = "Waktu selesai harus lebih besar dari waktu mulai" });
         }
 
-        // Cek konflik jadwal ruangan
+        // VALIDASI 3: Pastikan StartTime tidak di masa lalu
+        if (bookingDto.StartTime < DateTime.Now)
+        {
+            return BadRequest(new { message = "Waktu mulai tidak boleh di masa lalu" });
+        }
+
+        // VALIDASI 4: Cek konflik jadwal ruangan (exclude yang Rejected dan soft deleted)
         var hasConflict = await _context.Bookings
-            .AnyAsync(b => b.RoomId == bookingDto.RoomId
-                && b.Status == "Approved"
+            .Where(b => b.RoomId == bookingDto.RoomId
+                && b.Status != "Rejected"
+                && b.DeletedAt == null
                 && ((bookingDto.StartTime >= b.StartTime && bookingDto.StartTime < b.EndTime)
                     || (bookingDto.EndTime > b.StartTime && bookingDto.EndTime <= b.EndTime)
-                    || (bookingDto.StartTime <= b.StartTime && bookingDto.EndTime >= b.EndTime)));
+                    || (bookingDto.StartTime <= b.StartTime && bookingDto.EndTime >= b.EndTime)))
+            .AnyAsync();
 
         if (hasConflict)
         {
-            return Conflict(new { message = "Room is already booked for the selected time slot" });
+            return Conflict(new { message = $"Ruangan {room.RoomName} sudah dibooking pada rentang waktu tersebut" });
         }
 
         var booking = new Booking
@@ -98,26 +106,40 @@ public class BookingsController : ControllerBase
     [HttpPatch("{id}/status")]
     public async Task<IActionResult> UpdateBookingStatus(int id, UpdateStatusDto statusDto)
     {
-        var booking = await _context.Bookings.FindAsync(id);
+        var booking = await _context.Bookings
+            .Include(b => b.Room)
+            .FirstOrDefaultAsync(b => b.Id == id);
 
         if (booking == null)
         {
-            return NotFound(new { message = $"Booking with ID {id} not found" });
+            return NotFound(new { message = $"Peminjaman dengan ID {id} tidak ditemukan" });
         }
 
-        // Update status
+        // Validasi: Tidak bisa mengubah status booking yang sudah soft deleted
+        if (booking.DeletedAt != null)
+        {
+            return BadRequest(new { message = "Tidak dapat mengubah status peminjaman yang sudah dihapus" });
+        }
+
+        // Update status dan catatan admin (jika ada)
+        var oldStatus = booking.Status;
         booking.Status = statusDto.Status;
 
         try
         {
             await _context.SaveChangesAsync();
+
+            return Ok(new 
+            { 
+                message = $"Status peminjaman berhasil diubah dari {oldStatus} menjadi {booking.Status}",
+                adminNote = statusDto.AdminNote,
+                booking 
+            });
         }
         catch (DbUpdateConcurrencyException)
         {
-            return StatusCode(500, new { message = "Error updating booking status" });
+            return StatusCode(500, new { message = "Terjadi kesalahan saat mengubah status peminjaman" });
         }
-
-        return Ok(new { message = "Booking status updated successfully", booking });
     }
 
     // DELETE: api/Bookings/5 (Soft Delete)
@@ -131,12 +153,12 @@ public class BookingsController : ControllerBase
 
         if (booking == null)
         {
-            return NotFound(new { message = $"Booking with ID {id} not found" });
+            return NotFound(new { message = $"Peminjaman dengan ID {id} tidak ditemukan" });
         }
 
         if (booking.DeletedAt != null)
         {
-            return BadRequest(new { message = "Booking has already been deleted" });
+            return BadRequest(new { message = "Peminjaman ini sudah dihapus sebelumnya" });
         }
 
         // Soft Delete: Set DeletedAt timestamp
@@ -148,9 +170,13 @@ public class BookingsController : ControllerBase
         }
         catch (DbUpdateConcurrencyException)
         {
-            return StatusCode(500, new { message = "Error deleting booking" });
+            return StatusCode(500, new { message = "Terjadi kesalahan saat menghapus peminjaman" });
         }
 
-        return Ok(new { message = "Booking deleted successfully (soft delete)" });
+        return Ok(new 
+        { 
+            message = "Peminjaman berhasil dihapus (soft delete)",
+            deletedAt = booking.DeletedAt
+        });
     }
 }
