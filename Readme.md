@@ -109,6 +109,12 @@ dotnet run --configuration Release
 
 ## 📚 API Endpoints
 
+### Rooms
+
+| Method | Endpoint | Deskripsi |
+|--------|----------|-----------|
+| GET | `/api/Rooms` | Daftar semua ruangan |
+
 ### Bookings
 
 | Method | Endpoint | Deskripsi |
@@ -120,6 +126,11 @@ dotnet run --configuration Release
 | DELETE | `/api/Bookings/{id}` | Hapus peminjaman (soft delete) |
 
 ### Contoh Request
+
+**Get All Rooms:**
+```bash
+GET /api/Rooms
+```
 
 **Create Booking:**
 ```bash
