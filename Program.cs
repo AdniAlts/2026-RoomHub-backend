@@ -44,7 +44,8 @@ if (app.Environment.IsDevelopment())
     app.MapOpenApi();
 }
 
-app.UseHttpsRedirection();
+// Disabled for local development to prevent POST -> GET redirect (405 Method Not Allowed)
+// app.UseHttpsRedirection();
 
 // Use CORS
 app.UseCors("AllowReactApp");

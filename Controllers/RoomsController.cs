@@ -26,4 +26,14 @@ public class RoomsController : ControllerBase
 
         return Ok(rooms);
     }
+
+    // POST: api/Rooms
+    [HttpPost]
+    public async Task<ActionResult<Room>> CreateRoom(Room room)
+    {
+        _context.Rooms.Add(room);
+        await _context.SaveChangesAsync();
+
+        return CreatedAtAction(nameof(GetRooms), new { id = room.Id }, room);
+    }
 }
