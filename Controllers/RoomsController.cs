@@ -27,6 +27,20 @@ public class RoomsController : ControllerBase
         return Ok(rooms);
     }
 
+    // GET: api/Rooms/5
+    [HttpGet("{id}")]
+    public async Task<ActionResult<Room>> GetRoom(int id)
+    {
+        var room = await _context.Rooms.FindAsync(id);
+
+        if (room == null)
+        {
+            return NotFound(new { message = $"Ruangan dengan ID {id} tidak ditemukan" });
+        }
+
+        return Ok(room);
+    }
+
     // POST: api/Rooms
     [HttpPost]
     public async Task<ActionResult<Room>> CreateRoom(Room room)
@@ -34,6 +48,35 @@ public class RoomsController : ControllerBase
         _context.Rooms.Add(room);
         await _context.SaveChangesAsync();
 
-        return CreatedAtAction(nameof(GetRooms), new { id = room.Id }, room);
+        return CreatedAtAction(nameof(GetRoom), new { id = room.Id }, room);
+    }
+
+    // DELETE: api/Rooms/5 (Hard Delete)
+    [HttpDelete("{id}")]
+    public async Task<IActionResult> DeleteRoom(int id)
+    {
+        var room = await _context.Rooms.FindAsync(id);
+
+        if (room == null)
+        {
+            return NotFound(new { message = $"Ruangan dengan ID {id} tidak ditemukan" });
+        }
+
+        // Cek apakah ada booking aktif (Pending/Approved) yang menggunakan ruangan ini
+        var hasActiveBookings = await _context.Bookings
+            .AnyAsync(b => b.RoomId == id
+                && b.DeletedAt == null
+                && b.Status != "Rejected");
+
+        if (hasActiveBookings)
+        {
+            return Conflict(new { message = $"Ruangan {room.RoomName} masih memiliki peminjaman aktif dan tidak dapat dihapus" });
+        }
+
+        _context.Rooms.Remove(room);
+        await _context.SaveChangesAsync();
+
+        return Ok(new { message = $"Ruangan {room.RoomName} berhasil dihapus" });
     }
 }
+
