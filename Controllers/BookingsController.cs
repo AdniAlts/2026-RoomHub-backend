@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
+using System.Security.Claims;
 using Backend.Data;
 using Backend.Models;
 
@@ -7,6 +9,7 @@ namespace Backend.Controllers;
 
 [Route("api/[controller]")]
 [ApiController]
+[Authorize]
 public class BookingsController : ControllerBase
 {
     private readonly AppDbContext _context;
@@ -20,8 +23,19 @@ public class BookingsController : ControllerBase
     [HttpGet]
     public async Task<ActionResult<IEnumerable<Booking>>> GetBookings()
     {
-        var bookings = await _context.Bookings
-            .Include(b => b.Room)
+        var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var role = User.FindFirstValue(ClaimTypes.Role)!;
+
+        IQueryable<Booking> query = _context.Bookings
+            .Include(b => b.Room);
+
+        // Mahasiswa hanya bisa melihat booking miliknya sendiri
+        if (role != "Admin")
+        {
+            query = query.Where(b => b.UserId == userId);
+        }
+
+        var bookings = await query
             .OrderByDescending(b => b.StartTime)
             .ToListAsync();
 
@@ -32,6 +46,9 @@ public class BookingsController : ControllerBase
     [HttpGet("{id}")]
     public async Task<ActionResult<Booking>> GetBooking(int id)
     {
+        var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var role = User.FindFirstValue(ClaimTypes.Role)!;
+
         var booking = await _context.Bookings
             .Include(b => b.Room)
             .FirstOrDefaultAsync(b => b.Id == id);
@@ -41,6 +58,12 @@ public class BookingsController : ControllerBase
             return NotFound(new { message = $"Booking with ID {id} not found" });
         }
 
+        // Mahasiswa hanya bisa melihat booking miliknya
+        if (role != "Admin" && booking.UserId != userId)
+        {
+            return Forbid();
+        }
+
         return Ok(booking);
     }
 
@@ -48,6 +71,10 @@ public class BookingsController : ControllerBase
     [HttpPost]
     public async Task<ActionResult<Booking>> CreateBooking(CreateBookingDto bookingDto)
     {
+        var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var fullName = User.FindFirstValue(ClaimTypes.GivenName)!;
+        var user = await _context.Users.FindAsync(userId);
+
         // VALIDASI 1: Cek apakah Ruangan ada di database
         var room = await _context.Rooms.FindAsync(bookingDto.RoomId);
         if (room == null)
@@ -85,8 +112,9 @@ public class BookingsController : ControllerBase
         var booking = new Booking
         {
             RoomId = bookingDto.RoomId,
-            BorrowerName = bookingDto.BorrowerName,
-            BorrowerId = bookingDto.BorrowerId,
+            UserId = userId,
+            BorrowerName = fullName,
+            BorrowerId = user?.StudentId ?? "",
             Purpose = bookingDto.Purpose,
             StartTime = bookingDto.StartTime,
             EndTime = bookingDto.EndTime,
@@ -102,8 +130,9 @@ public class BookingsController : ControllerBase
         return CreatedAtAction(nameof(GetBooking), new { id = booking.Id }, booking);
     }
 
-    // PATCH: api/Bookings/5/status
+    // PATCH: api/Bookings/5/status (Admin only)
     [HttpPatch("{id}/status")]
+    [Authorize(Roles = "Admin")]
     public async Task<IActionResult> UpdateBookingStatus(int id, UpdateStatusDto statusDto)
     {
         var booking = await _context.Bookings
@@ -146,6 +175,9 @@ public class BookingsController : ControllerBase
     [HttpDelete("{id}")]
     public async Task<IActionResult> DeleteBooking(int id)
     {
+        var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var role = User.FindFirstValue(ClaimTypes.Role)!;
+
         // Gunakan IgnoreQueryFilters untuk mengambil data termasuk yang sudah soft deleted
         var booking = await _context.Bookings
             .IgnoreQueryFilters()
@@ -154,6 +186,12 @@ public class BookingsController : ControllerBase
         if (booking == null)
         {
             return NotFound(new { message = $"Peminjaman dengan ID {id} tidak ditemukan" });
+        }
+
+        // Mahasiswa hanya bisa hapus booking miliknya
+        if (role != "Admin" && booking.UserId != userId)
+        {
+            return Forbid();
         }
 
         if (booking.DeletedAt != null)

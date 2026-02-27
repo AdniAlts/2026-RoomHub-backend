@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using Backend.Data;
 using Backend.Models;
@@ -7,6 +8,7 @@ namespace Backend.Controllers;
 
 [Route("api/[controller]")]
 [ApiController]
+[Authorize]
 public class RoomsController : ControllerBase
 {
     private readonly AppDbContext _context;
@@ -16,7 +18,7 @@ public class RoomsController : ControllerBase
         _context = context;
     }
 
-    // GET: api/Rooms
+    // GET: api/Rooms (All roles)
     [HttpGet]
     public async Task<ActionResult<IEnumerable<Room>>> GetRooms()
     {
@@ -27,7 +29,7 @@ public class RoomsController : ControllerBase
         return Ok(rooms);
     }
 
-    // GET: api/Rooms/5
+    // GET: api/Rooms/5 (All roles)
     [HttpGet("{id}")]
     public async Task<ActionResult<Room>> GetRoom(int id)
     {
@@ -41,8 +43,9 @@ public class RoomsController : ControllerBase
         return Ok(room);
     }
 
-    // POST: api/Rooms
+    // POST: api/Rooms (Admin only)
     [HttpPost]
+    [Authorize(Roles = "Admin")]
     public async Task<ActionResult<Room>> CreateRoom(Room room)
     {
         _context.Rooms.Add(room);
@@ -51,8 +54,9 @@ public class RoomsController : ControllerBase
         return CreatedAtAction(nameof(GetRoom), new { id = room.Id }, room);
     }
 
-    // DELETE: api/Rooms/5 (Hard Delete)
+    // DELETE: api/Rooms/5 (Admin only, Hard Delete)
     [HttpDelete("{id}")]
+    [Authorize(Roles = "Admin")]
     public async Task<IActionResult> DeleteRoom(int id)
     {
         var room = await _context.Rooms.FindAsync(id);
@@ -79,4 +83,3 @@ public class RoomsController : ControllerBase
         return Ok(new { message = $"Ruangan {room.RoomName} berhasil dihapus" });
     }
 }
-

@@ -11,6 +11,7 @@ public class AppDbContext : DbContext
 
     public DbSet<Room> Rooms { get; set; }
     public DbSet<Booking> Bookings { get; set; }
+    public DbSet<User> Users { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -26,6 +27,41 @@ public class AppDbContext : DbContext
             .WithMany()
             .HasForeignKey(b => b.RoomId)
             .OnDelete(DeleteBehavior.Restrict);
+
+        // Konfigurasi relasi User -> Booking
+        modelBuilder.Entity<Booking>()
+            .HasOne(b => b.User)
+            .WithMany()
+            .HasForeignKey(b => b.UserId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        // Unique index on Username
+        modelBuilder.Entity<User>()
+            .HasIndex(u => u.Username)
+            .IsUnique();
+
+        // Seed Data untuk Users
+        // admin123 and mahasiswa123 hashes (BCrypt, pre-computed)
+        modelBuilder.Entity<User>().HasData(
+            new User
+            {
+                Id = 1,
+                Username = "admin",
+                FullName = "Administrator",
+                StudentId = null,
+                PasswordHash = "$2a$11$QpGo3uStqRjoAQHuBd0oc.WT8IOxjBz1aUTtSHzPMnYmeh43mwJKS", // admin123
+                Role = "Admin"
+            },
+            new User
+            {
+                Id = 2,
+                Username = "mahasiswa",
+                FullName = "Mahasiswa Demo",
+                StudentId = "2026001",
+                PasswordHash = "$2a$11$QpGo3uStqRjoAQHuBd0oc.mQp5PkfBq9E7MwqvCIVXfpEKvZgjkUe", // mahasiswa123
+                Role = "Mahasiswa"
+            }
+        );
 
         // Seed Data untuk Rooms
         modelBuilder.Entity<Room>().HasData(
@@ -62,3 +98,4 @@ public class AppDbContext : DbContext
         );
     }
 }
+

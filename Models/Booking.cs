@@ -8,6 +8,8 @@ public class Booking
 
     public int RoomId { get; set; }
 
+    public int? UserId { get; set; }
+
     [Required]
     public string BorrowerName { get; set; } = string.Empty;
 
@@ -24,6 +26,7 @@ public class Booking
     // Soft Delete Implementation
     public DateTime? DeletedAt { get; set; }
 
-    // Navigation Property
+    // Navigation Properties
     public Room? Room { get; set; }
+    public User? User { get; set; }
 }

@@ -1,5 +1,8 @@
 using Backend.Data;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
+using System.Text;
 using DotNetEnv;
 
 // Load environment variables from .env file
@@ -24,6 +27,30 @@ var connectionString = $"Host={dbHost};Database={dbName};Username={dbUser};Passw
 // Configure PostgreSQL Database Connection
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(connectionString));
+
+// Configure JWT Authentication
+var jwtKey = Environment.GetEnvironmentVariable("JWT_SECRET_KEY") ?? "DefaultSecretKey_ChangeInProduction";
+var key = Encoding.UTF8.GetBytes(jwtKey);
+
+builder.Services.AddAuthentication(options =>
+{
+    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+})
+.AddJwtBearer(options =>
+{
+    options.TokenValidationParameters = new TokenValidationParameters
+    {
+        ValidateIssuerSigningKey = true,
+        IssuerSigningKey = new SymmetricSecurityKey(key),
+        ValidateIssuer = false,
+        ValidateAudience = false,
+        ValidateLifetime = true,
+        ClockSkew = TimeSpan.Zero
+    };
+});
+
+builder.Services.AddAuthorization();
 
 // Configure CORS
 builder.Services.AddCors(options =>
@@ -50,7 +77,14 @@ if (app.Environment.IsDevelopment())
 // Use CORS
 app.UseCors("AllowReactApp");
 
+// Authentication & Authorization
+app.UseAuthentication();
+app.UseAuthorization();
+
 // Map Controllers
 app.MapControllers();
+
+// Seed admin user
+await DbSeeder.SeedAdminUser(app.Services);
 
 app.Run();
